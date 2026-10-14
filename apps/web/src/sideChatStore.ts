@@ -61,6 +61,23 @@ export const useSideChatFocusStore = create<SideChatFocusState>()((set) => ({
     }),
 }));
 
+// Side chats this client just started, by scoped thread key. The panel plays
+// the entry animation on its first mount and then forgets the key, so
+// switching tabs or reopening the side chat later shows it at once.
+const enteringSideChats = new Set<string>();
+
+export function markSideChatEntering(threadKey: string) {
+  enteringSideChats.add(threadKey);
+}
+
+export function isSideChatEntering(threadKey: string): boolean {
+  return enteringSideChats.has(threadKey);
+}
+
+export function forgetSideChatEntering(threadKey: string) {
+  enteringSideChats.delete(threadKey);
+}
+
 /**
  * The side chat a thread's composer talks to: the one picked, while its tab is
  * the active surface of an open panel. Closing the panel or switching tabs

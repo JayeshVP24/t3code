@@ -464,18 +464,18 @@ import {
   resolveScrollToEndClearance,
 } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
-import { SideChatReplyBar } from "./chat/SideChatReplyBar";
 import { SideChatHeader } from "./chat/SideChatHeader";
 import { useAsideTitles } from "../hooks/useAsideTitles";
 import { useSideChatHost } from "../hooks/useSideChatHost";
 import { type SideChatEmbedding, useSideChatGuest } from "../hooks/useSideChatGuest";
+import { forgetSideChatEntering, isSideChatEntering } from "../sideChatStore";
 import { ComposerAnchor } from "./chat/ComposerAnchor";
 import {
   parseSideCommand,
   SIDE_CHAT_OWN_COMMANDS,
   SIDE_CHAT_PASSTHROUGH_COMMANDS,
 } from "../sideChat.logic";
-import { chatViewOf } from "./chat/composerEventScope";
+import { chatViewOf, resolvePasteComposerTarget } from "./chat/composerEventScope";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
@@ -2436,8 +2436,7 @@ export default function ChatView(props: ChatViewProps) {
     available: sideChatsAvailable,
     focusedSideChatId,
     sideComposerRef,
-    composerSlot: sideChatComposerSlot,
-    setComposerSlot: setSideChatComposerSlot,
+    releaseSideChat,
     onAskAboutResponse,
     onAskAssistantText,
   } = useSideChatHost({
@@ -2445,9 +2444,6 @@ export default function ChatView(props: ChatViewProps) {
     composerRef,
     panelOpen: rightPanelOpen,
     activeSurface: activeRightPanelSurface,
-    // A maximized panel collapses this column and a sheet covers it, so a
-    // focused side chat keeps its composer in the panel there.
-    panelBesideColumn: rightPanelOpen && !shouldUsePlanSidebarSheet && !rightPanelMaximized,
   });
   const runSideChatCommand = sideChats.run;
   const inlineRightPanelOwnsTitleBar = rightPanelOpen && !shouldUsePlanSidebarSheet;
@@ -5559,6 +5555,18 @@ export default function ChatView(props: ChatViewProps) {
     }
     useRightPanelStore.getState().open(activeThreadRef, "device");
   }, [activeThreadRef, deviceState.onboardingCompleted, deviceState.hostStatus]);
+  // The panel's `+` starts a fresh side chat, with the same remembered
+  // history choice as the `+` in Thread details.
+  const sideChatStart = sideChats.start;
+  const sideChatHistoryAvailable = sideChats.historyAvailability.available;
+  const sideChatLastHistoryChoice = sideChats.lastHistoryChoice;
+  const addSideChatSurface = useCallback(() => {
+    if (!sideChatsAvailable) return;
+    void sideChatStart({
+      history:
+        sideChatLastHistoryChoice === "with" && sideChatHistoryAvailable ? "with" : "without",
+    });
+  }, [sideChatHistoryAvailable, sideChatLastHistoryChoice, sideChatStart, sideChatsAvailable]);
   // A device the agent opens floats over chat like an agent-driven browser,
   // or becomes a panel tab when floating previews are off. Sessions opened by
   // another client arrive the same way; sheet layouts get neither. The first
@@ -8550,13 +8558,16 @@ export default function ChatView(props: ChatViewProps) {
     if (embedded) return;
     const handler = (event: ClipboardEvent) => {
       if (!activeThreadId || isCommandPaletteOpen()) return;
-      // A paste inside a side chat goes to its composer only while it has the
-      // thread's composer; otherwise it isn't this thread's to take.
-      const targetChat = chatViewOf(event.target);
-      if (targetChat !== null && targetChat !== focusedSideChatId) return;
+      // A paste inside a side chat goes to its own composer, which always
+      // renders in its panel; elsewhere it follows composer focus.
       if (getTerminalFocusOwner() !== null) return;
       const pasteComposer =
-        focusedSideChatId !== null ? sideComposerRef.current : composerRef.current;
+        resolvePasteComposerTarget({
+          targetChatId: chatViewOf(event.target),
+          focusedSideChatId,
+        }) === "side"
+          ? sideComposerRef.current
+          : composerRef.current;
       if (pasteComposer?.isModelPickerOpen()) return;
       const text = pasteTextToFocusComposer(event);
       const clipboardData = event.clipboardData;
@@ -11375,7 +11386,6 @@ export default function ChatView(props: ChatViewProps) {
         threadId={renderedRightPanelSurface.threadId as ThreadId}
         composerRef={sideComposerRef}
         focused={focusedSideChatId === renderedRightPanelSurface.threadId}
-        composerSlot={sideChatComposerSlot}
       />
     ) : renderedRightPanelSurface?.kind === "device" ? (
       <Suspense fallback={null}>
@@ -11645,7 +11655,10 @@ export default function ChatView(props: ChatViewProps) {
         )}
 
         {/* Main content area with optional plan sidebar */}
-        <div className="relative flex min-h-0 min-w-0 flex-1">
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1"
+          {...(sideChat?.entering ? { "data-side-chat-entering": "" } : {})}
+        >
           {/* Chat column */}
           <ThreadFindCanvas
             findOptions={{
@@ -11703,7 +11716,7 @@ export default function ChatView(props: ChatViewProps) {
               />
             </div>
             {/* Messages Wrapper */}
-            <div className="relative flex min-h-0 flex-1 flex-col bg-background">
+            <div className="relative flex min-h-0 flex-1 flex-col bg-background" data-chat-messages>
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
@@ -11893,25 +11906,7 @@ export default function ChatView(props: ChatViewProps) {
                   ) : null}
                   <ComposerAnchor
                     anchorRef={draftHeroTransition.composerAnchorRef}
-                    placement={
-                      sideChat
-                        ? {
-                            kind: "side-chat",
-                            threadId,
-                            focused: sideChat.focused,
-                            slot: sideChat.composerSlot,
-                            replyBar: (
-                              <SideChatReplyBar
-                                needsAnswer={
-                                  pendingApprovals.length > 0 || pendingUserInputs.length > 0
-                                }
-                                onReply={sideChatGuest.focus}
-                              />
-                            ),
-                          }
-                        : { kind: "host", hidden: focusedSideChatId !== null }
-                    }
-                    slotRef={setSideChatComposerSlot}
+                    onFocusCapture={sideChat ? sideChatGuest.focus : releaseSideChat}
                     style={
                       forceExpandedMobileComposer
                         ? { viewTransitionName: MOBILE_COMPOSER_VIEW_TRANSITION_NAME }
@@ -12321,6 +12316,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
           onAddDevice={addDeviceSurface}
+          onAddSideChat={addSideChatSurface}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
           diffAvailable={isServerThread && isGitRepo}
@@ -12328,6 +12324,7 @@ export default function ChatView(props: ChatViewProps) {
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}
           deviceAvailable={activeThreadRef !== null}
+          sideChatAvailable={sideChatsAvailable}
         >
           {rightPanelContent}
         </RightPanelTabs>
@@ -12381,6 +12378,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
             onAddDevice={addDeviceSurface}
+            onAddSideChat={addSideChatSurface}
             browserAvailable={canOperatePreview && browserAvailable}
             terminalAvailable={activeProject !== null && canOperateTerminal}
             diffAvailable={isServerThread && isGitRepo}
@@ -12388,6 +12386,7 @@ export default function ChatView(props: ChatViewProps) {
             pullRequestAvailable={pullRequestSurfaceAvailable}
             pullRequestsAvailable={pullRequestsSurfaceAvailable}
             deviceAvailable={activeThreadRef !== null}
+            sideChatAvailable={sideChatsAvailable}
           >
             {rightPanelContent}
           </RightPanelTabs>
@@ -12459,6 +12458,9 @@ function PreviewSessionSync(props: { readonly threadRef: ScopedThreadRef }) {
   return null;
 }
 
+/** The side chat entry in `index.css` runs 600ms; a little slack before it ends. */
+const SIDE_CHAT_ENTRY_MS = 700;
+
 /**
  * The right-panel surface for one side chat: the ordinary chat view of the
  * child thread. A side chat that was deleted or promoted elsewhere closes its
@@ -12470,17 +12472,28 @@ function SideChatPanel(props: {
   /** The parent's handle on this side chat's composer, for typing and paste anywhere. */
   composerRef: RefObject<ChatComposerHandle | null>;
   focused: boolean;
-  composerSlot: HTMLElement | null;
 }) {
   const childRef = useMemo(
     () => scopeThreadRef(props.parentRef.environmentId, props.threadId),
     [props.parentRef.environmentId, props.threadId],
   );
   const shell = useThreadShell(childRef);
-  const { parentRef, focused, composerSlot } = props;
+  const { parentRef, focused } = props;
+  // The panel mounts again on every tab switch, so the mark is read once here
+  // and dropped: only the first showing of a just-started side chat animates.
+  const childKey = scopedThreadKey(childRef);
+  const [entering, setEntering] = useState(() => isSideChatEntering(childKey));
+  useEffect(() => forgetSideChatEntering(childKey), [childKey]);
+  // Ends the entry after its CSS finishes. Timeline rows mount again as they
+  // scroll, so a lingering flag would replay the divider draw.
+  useEffect(() => {
+    if (!entering) return;
+    const timer = window.setTimeout(() => setEntering(false), SIDE_CHAT_ENTRY_MS);
+    return () => window.clearTimeout(timer);
+  }, [entering]);
   const sideChat = useMemo(
-    () => ({ parentRef, focused, composerSlot }),
-    [composerSlot, focused, parentRef],
+    () => ({ parentRef, focused, entering }),
+    [entering, focused, parentRef],
   );
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const gone = bootstrapped && (shell === null || shell.deletedAt !== null || !shell.sideChat);
