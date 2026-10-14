@@ -50,9 +50,22 @@ function chatIdOf(element: Element | null): string | null {
 }
 
 /**
+ * Which composer a paste with no editable target goes to. A paste inside a
+ * side chat belongs to its own composer, which always renders in its panel;
+ * a paste in the host area goes to the side chat only while it has this
+ * thread's composer focus.
+ */
+export function resolvePasteComposerTarget(input: {
+  readonly targetChatId: string | null;
+  readonly focusedSideChatId: string | null;
+}): "side" | "host" {
+  if (input.targetChatId !== null) return "side";
+  return input.focusedSideChatId !== null ? "side" : "host";
+}
+
+/**
  * The thread id of the side chat that owns `target`, or null for the host
- * chat. A side chat's composer renders in the host's composer slot while it
- * has focus, so ownership is the attribute's value, not one root element.
+ * chat. Ownership is the embedded root's attribute value, not one element.
  */
 export function chatViewOf(target: EventTarget | null): string | null {
   if (!(target instanceof Element)) return null;

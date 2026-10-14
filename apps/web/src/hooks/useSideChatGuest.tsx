@@ -5,6 +5,7 @@ import { type RefObject, useCallback, useEffect, useMemo } from "react";
 
 import type { ChatComposerHandle } from "../components/chat/ChatComposer";
 import type { ComposerBannerStackItem } from "../components/chat/ComposerBannerStack";
+import { chatViewOf } from "../components/chat/composerEventScope";
 import { Button } from "../components/ui/button";
 import { useSideChatFocusStore } from "../sideChatStore";
 import { useThreadShell } from "../state/entities";
@@ -12,10 +13,8 @@ import { useThreadShell } from "../state/entities";
 /** How a parent thread shows one of its side chats in its right panel. */
 export interface SideChatEmbedding {
   readonly parentRef: ScopedThreadRef;
-  /** It has the parent's composer. */
+  /** The parent's redirected input talks to this side chat. */
   readonly focused: boolean;
-  /** Where its composer renders while focused; null keeps it in the panel. */
-  readonly composerSlot: HTMLElement | null;
 }
 
 /**
@@ -40,21 +39,26 @@ export function useSideChatGuest(input: {
     if (parentKey !== null) useSideChatFocusStore.getState().release(parentKey, threadId);
   }, [parentKey, threadId]);
 
-  // The composer remounts when it moves between the parent's slot and the panel
-  // (maximizing), so it takes the keyboard on every move, not just on focus.
-  const composerPlace = !focused ? null : sideChat?.composerSlot ? "slot" : "panel";
+  // Taking focus programmatically (starting or reopening the side chat) puts
+  // the keyboard in its composer. A click into the composer already placed
+  // the caret, so leave it where the user put it.
   useEffect(() => {
-    if (composerPlace === null) return;
-    const frame = requestAnimationFrame(() => composerRef.current?.focusAtEnd());
+    if (!focused) return;
+    const frame = requestAnimationFrame(() => {
+      if (chatViewOf(document.activeElement) === threadId) return;
+      composerRef.current?.focusAtEnd();
+    });
     return () => cancelAnimationFrame(frame);
-  }, [composerPlace, composerRef]);
+  }, [composerRef, focused, threadId]);
 
   // The parent's own questions stay one Escape away.
   const parentShell = useThreadShell(parentRef);
   const parentAwaitingAnswer =
     parentShell?.hasPendingApprovals === true || parentShell?.hasPendingUserInput === true;
   const bannerItems = useMemo<ComposerBannerStackItem[]>(() => {
-    if (sideChat === undefined) return composerBannerItems;
+    // The banners explain where messages go while this side chat has the
+    // thread's input; its composer is visible either way.
+    if (sideChat === undefined || !focused) return composerBannerItems;
     const sideItems: ComposerBannerStackItem[] = [];
     if (parentAwaitingAnswer) {
       sideItems.push({
@@ -87,7 +91,7 @@ export function useSideChatGuest(input: {
       onDismiss: release,
     });
     return [...sideItems, ...composerBannerItems];
-  }, [composerBannerItems, parentAwaitingAnswer, release, sideChat]);
+  }, [composerBannerItems, focused, parentAwaitingAnswer, release, sideChat]);
 
   const composerProps = useMemo(
     () =>

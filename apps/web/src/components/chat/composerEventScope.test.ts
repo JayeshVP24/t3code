@@ -7,6 +7,7 @@ import {
   isInsideCollapsedComposerControls,
   isInsideComposerFloatingLayer,
   isInsideRestingComposerControlScope,
+  resolvePasteComposerTarget,
   useComposerMenuProps,
 } from "./composerEventScope";
 
@@ -58,6 +59,26 @@ describe("composer menu focus", () => {
     } finally {
       await act(() => renderer.unmount());
     }
+  });
+});
+
+describe("paste composer target", () => {
+  it("routes a paste inside a side chat to its own composer, focused or not", () => {
+    expect(resolvePasteComposerTarget({ targetChatId: "side-1", focusedSideChatId: null })).toBe(
+      "side",
+    );
+    expect(
+      resolvePasteComposerTarget({ targetChatId: "side-1", focusedSideChatId: "side-1" }),
+    ).toBe("side");
+  });
+
+  it("routes a paste in the host area to the side chat only while it has focus", () => {
+    expect(resolvePasteComposerTarget({ targetChatId: null, focusedSideChatId: "side-1" })).toBe(
+      "side",
+    );
+    expect(resolvePasteComposerTarget({ targetChatId: null, focusedSideChatId: null })).toBe(
+      "host",
+    );
   });
 });
 

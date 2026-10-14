@@ -464,7 +464,6 @@ import {
   resolveScrollToEndClearance,
 } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
-import { SideChatReplyBar } from "./chat/SideChatReplyBar";
 import { SideChatHeader } from "./chat/SideChatHeader";
 import { useAsideTitles } from "../hooks/useAsideTitles";
 import { useSideChatHost } from "../hooks/useSideChatHost";
@@ -475,7 +474,7 @@ import {
   SIDE_CHAT_OWN_COMMANDS,
   SIDE_CHAT_PASSTHROUGH_COMMANDS,
 } from "../sideChat.logic";
-import { chatViewOf } from "./chat/composerEventScope";
+import { chatViewOf, resolvePasteComposerTarget } from "./chat/composerEventScope";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
 import { useOpenFavoriteEditorShortcut } from "./chat/OpenInPickerShortcut";
@@ -2436,8 +2435,7 @@ export default function ChatView(props: ChatViewProps) {
     available: sideChatsAvailable,
     focusedSideChatId,
     sideComposerRef,
-    composerSlot: sideChatComposerSlot,
-    setComposerSlot: setSideChatComposerSlot,
+    releaseSideChat,
     onAskAboutResponse,
     onAskAssistantText,
   } = useSideChatHost({
@@ -2445,9 +2443,6 @@ export default function ChatView(props: ChatViewProps) {
     composerRef,
     panelOpen: rightPanelOpen,
     activeSurface: activeRightPanelSurface,
-    // A maximized panel collapses this column and a sheet covers it, so a
-    // focused side chat keeps its composer in the panel there.
-    panelBesideColumn: rightPanelOpen && !shouldUsePlanSidebarSheet && !rightPanelMaximized,
   });
   const runSideChatCommand = sideChats.run;
   const inlineRightPanelOwnsTitleBar = rightPanelOpen && !shouldUsePlanSidebarSheet;
@@ -8550,13 +8545,16 @@ export default function ChatView(props: ChatViewProps) {
     if (embedded) return;
     const handler = (event: ClipboardEvent) => {
       if (!activeThreadId || isCommandPaletteOpen()) return;
-      // A paste inside a side chat goes to its composer only while it has the
-      // thread's composer; otherwise it isn't this thread's to take.
-      const targetChat = chatViewOf(event.target);
-      if (targetChat !== null && targetChat !== focusedSideChatId) return;
+      // A paste inside a side chat goes to its own composer, which always
+      // renders in its panel; elsewhere it follows composer focus.
       if (getTerminalFocusOwner() !== null) return;
       const pasteComposer =
-        focusedSideChatId !== null ? sideComposerRef.current : composerRef.current;
+        resolvePasteComposerTarget({
+          targetChatId: chatViewOf(event.target),
+          focusedSideChatId,
+        }) === "side"
+          ? sideComposerRef.current
+          : composerRef.current;
       if (pasteComposer?.isModelPickerOpen()) return;
       const text = pasteTextToFocusComposer(event);
       const clipboardData = event.clipboardData;
@@ -11375,7 +11373,6 @@ export default function ChatView(props: ChatViewProps) {
         threadId={renderedRightPanelSurface.threadId as ThreadId}
         composerRef={sideComposerRef}
         focused={focusedSideChatId === renderedRightPanelSurface.threadId}
-        composerSlot={sideChatComposerSlot}
       />
     ) : renderedRightPanelSurface?.kind === "device" ? (
       <Suspense fallback={null}>
@@ -11893,25 +11890,7 @@ export default function ChatView(props: ChatViewProps) {
                   ) : null}
                   <ComposerAnchor
                     anchorRef={draftHeroTransition.composerAnchorRef}
-                    placement={
-                      sideChat
-                        ? {
-                            kind: "side-chat",
-                            threadId,
-                            focused: sideChat.focused,
-                            slot: sideChat.composerSlot,
-                            replyBar: (
-                              <SideChatReplyBar
-                                needsAnswer={
-                                  pendingApprovals.length > 0 || pendingUserInputs.length > 0
-                                }
-                                onReply={sideChatGuest.focus}
-                              />
-                            ),
-                          }
-                        : { kind: "host", hidden: focusedSideChatId !== null }
-                    }
-                    slotRef={setSideChatComposerSlot}
+                    onFocusCapture={sideChat ? sideChatGuest.focus : releaseSideChat}
                     style={
                       forceExpandedMobileComposer
                         ? { viewTransitionName: MOBILE_COMPOSER_VIEW_TRANSITION_NAME }
@@ -12470,18 +12449,14 @@ function SideChatPanel(props: {
   /** The parent's handle on this side chat's composer, for typing and paste anywhere. */
   composerRef: RefObject<ChatComposerHandle | null>;
   focused: boolean;
-  composerSlot: HTMLElement | null;
 }) {
   const childRef = useMemo(
     () => scopeThreadRef(props.parentRef.environmentId, props.threadId),
     [props.parentRef.environmentId, props.threadId],
   );
   const shell = useThreadShell(childRef);
-  const { parentRef, focused, composerSlot } = props;
-  const sideChat = useMemo(
-    () => ({ parentRef, focused, composerSlot }),
-    [composerSlot, focused, parentRef],
-  );
+  const { parentRef, focused } = props;
+  const sideChat = useMemo(() => ({ parentRef, focused }), [focused, parentRef]);
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const gone = bootstrapped && (shell === null || shell.deletedAt !== null || !shell.sideChat);
   useEffect(() => {
