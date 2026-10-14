@@ -464,10 +464,12 @@ import {
   resolveScrollToEndClearance,
 } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
+import { SideChatEntryLoader } from "./chat/SideChatEntryLoader";
 import { SideChatHeader } from "./chat/SideChatHeader";
 import { useAsideTitles } from "../hooks/useAsideTitles";
 import { useSideChatHost } from "../hooks/useSideChatHost";
 import { type SideChatEmbedding, useSideChatGuest } from "../hooks/useSideChatGuest";
+import { forgetSideChatEntering, isSideChatEntering } from "../sideChatStore";
 import { ComposerAnchor } from "./chat/ComposerAnchor";
 import {
   parseSideCommand,
@@ -11654,7 +11656,16 @@ export default function ChatView(props: ChatViewProps) {
         )}
 
         {/* Main content area with optional plan sidebar */}
-        <div className="relative flex min-h-0 min-w-0 flex-1">
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1"
+          {...(sideChat?.entering ? { "data-side-chat-entering": "" } : {})}
+        >
+          {sideChat?.entering ? (
+            <SideChatEntryLoader
+              forked={activeThreadShell?.lineage.relationshipToParent === "fork"}
+              onDone={sideChat.onEntered}
+            />
+          ) : null}
           {/* Chat column */}
           <ThreadFindCanvas
             findOptions={{
@@ -12472,7 +12483,16 @@ function SideChatPanel(props: {
   );
   const shell = useThreadShell(childRef);
   const { parentRef, focused } = props;
-  const sideChat = useMemo(() => ({ parentRef, focused }), [focused, parentRef]);
+  // The panel mounts again on every tab switch, so the mark is read once here
+  // and dropped: only the first showing of a just-started side chat animates.
+  const childKey = scopedThreadKey(childRef);
+  const [entering, setEntering] = useState(() => isSideChatEntering(childKey));
+  useEffect(() => forgetSideChatEntering(childKey), [childKey]);
+  const onEntered = useCallback(() => setEntering(false), []);
+  const sideChat = useMemo(
+    () => ({ parentRef, focused, entering, onEntered }),
+    [entering, focused, onEntered, parentRef],
+  );
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const gone = bootstrapped && (shell === null || shell.deletedAt !== null || !shell.sideChat);
   useEffect(() => {

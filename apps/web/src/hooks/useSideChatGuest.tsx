@@ -15,6 +15,9 @@ export interface SideChatEmbedding {
   readonly parentRef: ScopedThreadRef;
   /** The parent's redirected input talks to this side chat. */
   readonly focused: boolean;
+  /** First showing of a side chat this client just started: play the entry. */
+  readonly entering: boolean;
+  readonly onEntered: () => void;
 }
 
 /**
