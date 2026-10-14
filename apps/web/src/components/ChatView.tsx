@@ -465,6 +465,7 @@ import { SideChatHeader } from "./chat/SideChatHeader";
 import { useAsideTitles } from "../hooks/useAsideTitles";
 import { useSideChatHost } from "../hooks/useSideChatHost";
 import { type SideChatEmbedding, useSideChatGuest } from "../hooks/useSideChatGuest";
+import { forgetSideChatEntering, isSideChatEntering } from "../sideChatStore";
 import { ComposerAnchor } from "./chat/ComposerAnchor";
 import {
   parseSideCommand,
@@ -11644,7 +11645,10 @@ export default function ChatView(props: ChatViewProps) {
         )}
 
         {/* Main content area with optional plan sidebar */}
-        <div className="relative flex min-h-0 min-w-0 flex-1">
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1"
+          {...(sideChat?.entering ? { "data-side-chat-entering": "" } : {})}
+        >
           {/* Chat column */}
           <ThreadFindCanvas
             findOptions={{
@@ -11702,7 +11706,7 @@ export default function ChatView(props: ChatViewProps) {
               />
             </div>
             {/* Messages Wrapper */}
-            <div className="relative flex min-h-0 flex-1 flex-col bg-background">
+            <div className="relative flex min-h-0 flex-1 flex-col bg-background" data-chat-messages>
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
@@ -12428,6 +12432,9 @@ function PreviewSessionSync(props: { readonly threadRef: ScopedThreadRef }) {
   return null;
 }
 
+/** The side chat entry in `index.css` runs 600ms; a little slack before it ends. */
+const SIDE_CHAT_ENTRY_MS = 700;
+
 /**
  * The right-panel surface for one side chat: the ordinary chat view of the
  * child thread. A side chat that was deleted or promoted elsewhere closes its
@@ -12446,7 +12453,22 @@ function SideChatPanel(props: {
   );
   const shell = useThreadShell(childRef);
   const { parentRef, focused } = props;
-  const sideChat = useMemo(() => ({ parentRef, focused }), [focused, parentRef]);
+  // The panel mounts again on every tab switch, so the mark is read once here
+  // and dropped: only the first showing of a just-started side chat animates.
+  const childKey = scopedThreadKey(childRef);
+  const [entering, setEntering] = useState(() => isSideChatEntering(childKey));
+  useEffect(() => forgetSideChatEntering(childKey), [childKey]);
+  // Ends the entry after its CSS finishes. Timeline rows mount again as they
+  // scroll, so a lingering flag would replay the divider draw.
+  useEffect(() => {
+    if (!entering) return;
+    const timer = window.setTimeout(() => setEntering(false), SIDE_CHAT_ENTRY_MS);
+    return () => window.clearTimeout(timer);
+  }, [entering]);
+  const sideChat = useMemo(
+    () => ({ parentRef, focused, entering }),
+    [entering, focused, parentRef],
+  );
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
   const gone = bootstrapped && (shell === null || shell.deletedAt !== null || !shell.sideChat);
   useEffect(() => {

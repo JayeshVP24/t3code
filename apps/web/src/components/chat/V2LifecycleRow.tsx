@@ -160,12 +160,15 @@ export function V2LifecycleRow(props: {
   if (item.type === "fork") {
     const relatedThreadId = item.source.type === "run" ? item.source.threadId : item.targetThreadId;
     return (
-      <TimelineSystemDivider
-        label={item.source.type === "run" ? "Forked from conversation" : "Conversation fork"}
-        icon={GitForkIcon}
-        actionLabel={item.source.type === "run" ? "Open source conversation" : "Open fork"}
-        onAction={() => props.onOpenThread(relatedThreadId)}
-      />
+      // A new side chat draws this divider as it opens, see `index.css`.
+      <div data-timeline-fork-marker>
+        <TimelineSystemDivider
+          label={item.source.type === "run" ? "Forked from conversation" : "Conversation fork"}
+          icon={GitForkIcon}
+          actionLabel={item.source.type === "run" ? "Open source conversation" : "Open fork"}
+          onAction={() => props.onOpenThread(relatedThreadId)}
+        />
+      </div>
     );
   }
   if (item.type === "thread_created") {

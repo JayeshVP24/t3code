@@ -12,6 +12,7 @@ import { newMessageId, newThreadId } from "../lib/utils";
 import { useRightPanelStore } from "../rightPanelStore";
 import { isEmptySideChat, quoteForSideChat, sideChatsOf } from "../sideChat.logic";
 import {
+  markSideChatEntering,
   useSideChatFocusStore,
   useSideChatPreferenceStore,
   type SideChatHistoryChoice,
@@ -158,6 +159,7 @@ export function useSideChatActions(parentRef: ScopedThreadRef | null) {
         );
         return null;
       }
+      markSideChatEntering(scopedThreadKey(childRef));
       useRightPanelStore.getState().openAside(ownerRef, childThreadId);
       // The thread's composer talks to the side chat until Escape.
       useSideChatFocusStore.getState().focus(scopedThreadKey(ownerRef), childThreadId);
