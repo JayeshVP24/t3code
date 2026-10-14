@@ -5,6 +5,7 @@ panel next to the thread, stays out of the sidebar, and keeps working while the 
 
 ## Start one
 
+- The right panel's **+** menu has **Side chat** (letter `S`). It uses the kind you last picked.
 - **Thread details → Side chats → +** starts one. The arrow beside it chooses the kind.
 - **Ask** on selected text quotes the selection into a new side chat.
 - The fork button on a response has **Ask about this response**, which shares the thread up to that
@@ -18,9 +19,8 @@ panel next to the thread, stays out of the sidebar, and keeps working while the 
 
 Each side chat has its own composer at the bottom of its panel, next to the main thread's. Type in
 either one; each keeps its own draft, and neither borrows the other's place. Starting or reopening
-a side chat moves your keyboard to its composer, and a **Side chat** banner above it says where
-typing outside a composer goes. Press Escape, or the banner's close button, to give the keyboard
-back to the main thread. Clicking a composer talks through that one.
+a side chat moves your keyboard to its composer. Press Escape to give the keyboard back to the main
+thread. Clicking a composer talks through that one.
 
 If the main thread asks for an approval or an answer while you're in a side chat, a banner says
 so. Escape takes you to it.
@@ -28,8 +28,8 @@ so. Escape takes you to it.
 ## With or without history
 
 **With history** forks the thread at its last finished run, so a run still in progress is not part
-of it. The panel header says how far it sees, for example "Sees up to run 4". **Without history**
-starts empty and only links back to the thread. The **+** remembers your last choice.
+of it. **Without history** starts empty and only links back to the thread. The **+** remembers your
+last choice.
 
 With history is unavailable until the thread has a finished run, and for providers that cannot
 share their history with a new thread yet. The menu says which.

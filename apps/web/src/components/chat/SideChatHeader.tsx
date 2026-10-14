@@ -1,8 +1,5 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import {
-  describeSideChatVisibility,
-  resolveLatestMergeBackRun,
-} from "@t3tools/client-runtime/state/thread-workflows";
+import { resolveLatestMergeBackRun } from "@t3tools/client-runtime/state/thread-workflows";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowUpFromLineIcon, MoreHorizontalIcon, PenLineIcon, Trash2Icon } from "lucide-react";
@@ -12,15 +9,14 @@ import { useComposerDraftStore } from "../../composerDraftStore";
 import { useSideChatActions } from "../../hooks/useSideChatActions";
 import { useThreadProjection, useThreadShell } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Switch } from "../ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 /**
- * Top of an embedded side chat. States what the chat can see of its parent and
- * holds the ways out: allow edits, bring the answer back, promote, discard.
+ * Top of an embedded side chat. Holds the ways out: allow edits, bring the
+ * answer back, promote, discard.
  */
 export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: ThreadId }) {
   const navigate = useNavigate();
@@ -30,7 +26,6 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
   const parentThreadId = shell?.lineage.parentThreadId ?? null;
   const parentRef =
     parentThreadId === null ? null : scopeThreadRef(props.environmentId, parentThreadId);
-  const parentProjection = useThreadProjection(parentRef)?.projection ?? null;
   const actions = useSideChatActions(parentRef);
   const [busy, setBusy] = useState(false);
   // The composer's own permission pick is what the next send uses, so the
@@ -65,23 +60,6 @@ export function SideChatHeader(props: { environmentId: EnvironmentId; threadId: 
       className="flex h-9 shrink-0 items-center gap-2 border-b border-border/65 px-3"
       data-side-chat-header
     >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Badge variant="outline" className="shrink-0">
-              {describeSideChatVisibility({
-                forkedFrom: shell.forkedFrom,
-                parentRuns: parentProjection?.runs ?? null,
-              })}
-            </Badge>
-          }
-        />
-        <TooltipPopup side="bottom">
-          {shell.forkedFrom?.type === "run"
-            ? "Forked from the last finished run, so work still in progress is not included."
-            : "Linked to the main thread without its history."}
-        </TooltipPopup>
-      </Tooltip>
       <span className="min-w-0 flex-1" />
       <Tooltip>
         <TooltipTrigger
