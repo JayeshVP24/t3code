@@ -5,7 +5,6 @@ import {
   canDetachThreadProviderSession,
   canForkProjectedAssistantItem,
   deriveThreadQueueWorkflowState,
-  describeSideChatVisibility,
   resolveLatestMergeBackRun,
   resolveSideChatHistoryAvailability,
   threadSupportsProviderHandoff,
@@ -481,16 +480,5 @@ describe("side chat history", () => {
         ),
       ),
     ).toEqual({ available: true, upToRunOrdinal: 1 });
-  });
-
-  it("names what a side chat can see", () => {
-    const parentRuns = [{ id: "r4", ordinal: 4 }] as never;
-    expect(
-      describeSideChatVisibility({
-        forkedFrom: { type: "run", threadId: "thread", runId: "r4" } as never,
-        parentRuns,
-      }),
-    ).toBe("Sees up to run 4");
-    expect(describeSideChatVisibility({ forkedFrom: null, parentRuns })).toBe("Sees no history");
   });
 });

@@ -232,17 +232,6 @@ export function resolveSideChatHistoryAvailability(
   return { available: true, upToRunOrdinal: latestStable.ordinal };
 }
 
-/** What a side chat can see of its parent, for the panel header chip. */
-export function describeSideChatVisibility(input: {
-  readonly forkedFrom: OrchestrationV2ThreadProjection["thread"]["forkedFrom"];
-  readonly parentRuns: ReadonlyArray<Pick<Run, "id" | "ordinal">> | null;
-}): string {
-  if (input.forkedFrom?.type !== "run") return "Sees no history";
-  const runId = input.forkedFrom.runId;
-  const run = input.parentRuns?.find((candidate) => candidate.id === runId);
-  return run === undefined ? "Sees history" : `Sees up to run ${run.ordinal}`;
-}
-
 export interface SideChatListingShell {
   readonly environmentId: string;
   readonly id: string;

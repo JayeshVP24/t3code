@@ -16,6 +16,7 @@ vi.mock("~/browser/browserDefaults", () => ({ useBrowserDefaults: () => ({ profi
 let root: Root;
 let container: HTMLDivElement;
 const addFiles = vi.fn();
+const addSideChat = vi.fn();
 const noop = () => undefined;
 
 beforeEach(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   });
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
   addFiles.mockClear();
+  addSideChat.mockClear();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -84,6 +86,7 @@ async function renderPanel(overrides: Partial<ComponentProps<typeof RightPanelTa
         onAddPullRequest={noop}
         onAddPullRequests={noop}
         onAddDevice={noop}
+        onAddSideChat={addSideChat}
         browserAvailable={false}
         terminalAvailable={false}
         diffAvailable={false}
@@ -91,6 +94,7 @@ async function renderPanel(overrides: Partial<ComponentProps<typeof RightPanelTa
         pullRequestAvailable={false}
         pullRequestsAvailable={false}
         deviceAvailable={false}
+        sideChatAvailable={false}
         {...overrides}
       >
         content
@@ -138,6 +142,22 @@ describe("right panel new-tab shortcut", () => {
       expect(document.querySelector('[role="menu"]:not([data-closed])')).toBeNull();
     },
   );
+
+  it("offers a side chat in the menu and opens it with S when available", async () => {
+    await renderPanel({ sideChatAvailable: true });
+    await press("t", { metaKey: true });
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain("Side chat");
+    await press("s");
+    expect(addSideChat).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="menu"]:not([data-closed])')).toBeNull();
+  });
+
+  it("does not open a side chat with S when unavailable", async () => {
+    await renderPanel();
+    await press("t", { metaKey: true });
+    await press("s");
+    expect(addSideChat).not.toHaveBeenCalled();
+  });
 
   it("leaves the shortcut alone while the mounted panel is closed", async () => {
     await renderPanel({ open: false });

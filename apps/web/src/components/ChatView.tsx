@@ -5554,6 +5554,18 @@ export default function ChatView(props: ChatViewProps) {
     }
     useRightPanelStore.getState().open(activeThreadRef, "device");
   }, [activeThreadRef, deviceState.onboardingCompleted, deviceState.hostStatus]);
+  // The panel's `+` starts a fresh side chat, with the same remembered
+  // history choice as the `+` in Thread details.
+  const sideChatStart = sideChats.start;
+  const sideChatHistoryAvailable = sideChats.historyAvailability.available;
+  const sideChatLastHistoryChoice = sideChats.lastHistoryChoice;
+  const addSideChatSurface = useCallback(() => {
+    if (!sideChatsAvailable) return;
+    void sideChatStart({
+      history:
+        sideChatLastHistoryChoice === "with" && sideChatHistoryAvailable ? "with" : "without",
+    });
+  }, [sideChatHistoryAvailable, sideChatLastHistoryChoice, sideChatStart, sideChatsAvailable]);
   // A device the agent opens floats over chat like an agent-driven browser,
   // or becomes a panel tab when floating previews are off. Sessions opened by
   // another client arrive the same way; sheet layouts get neither. The first
@@ -12300,6 +12312,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
           onAddDevice={addDeviceSurface}
+          onAddSideChat={addSideChatSurface}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
           diffAvailable={isServerThread && isGitRepo}
@@ -12307,6 +12320,7 @@ export default function ChatView(props: ChatViewProps) {
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}
           deviceAvailable={activeThreadRef !== null}
+          sideChatAvailable={sideChatsAvailable}
         >
           {rightPanelContent}
         </RightPanelTabs>
@@ -12360,6 +12374,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
             onAddDevice={addDeviceSurface}
+            onAddSideChat={addSideChatSurface}
             browserAvailable={canOperatePreview && browserAvailable}
             terminalAvailable={activeProject !== null && canOperateTerminal}
             diffAvailable={isServerThread && isGitRepo}
@@ -12367,6 +12382,7 @@ export default function ChatView(props: ChatViewProps) {
             pullRequestAvailable={pullRequestSurfaceAvailable}
             pullRequestsAvailable={pullRequestsSurfaceAvailable}
             deviceAvailable={activeThreadRef !== null}
+            sideChatAvailable={sideChatsAvailable}
           >
             {rightPanelContent}
           </RightPanelTabs>
