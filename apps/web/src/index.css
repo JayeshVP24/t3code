@@ -2211,39 +2211,90 @@ code {
   }
 }
 
-/* A just-started side chat: 600ms in all. The bar fills, the loader fades off
-   the chat underneath, and the composer rises as it clears. The loader's own
-   animationend unmounts it, so its length is the whole sequence. */
-.side-chat-entry-loader {
-  animation: side-chat-entry-loader 600ms linear both;
+/* A just-started side chat: 600ms in all, ended by a timer in `SideChatPanel`.
+   The forked history is revealed from the top down, the fork divider under it
+   draws (icon, then lines opening outward), and the composer rises. */
+[data-side-chat-entering] [data-chat-messages] {
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 60%);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 60%);
+  -webkit-mask-size: 100% 250%;
+  mask-size: 100% 250%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: side-chat-entry-reveal 380ms cubic-bezier(0.33, 0, 0.2, 1) both;
 }
 
-.side-chat-entry-progress {
-  animation: side-chat-entry-progress 380ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+[data-side-chat-entering] [data-timeline-fork-marker] [data-divider-label] {
+  animation: side-chat-entry-pop 200ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+}
+
+/* Lucide's git-fork: trunk circle, two top circles, branch path, stem path.
+   Drawn trunk first, then stem, branch, and the two tips. */
+[data-side-chat-entering] [data-timeline-fork-marker] svg > * {
+  stroke-dasharray: 40;
+  animation: side-chat-entry-draw 140ms ease-out 460ms both;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] svg > :nth-child(1) {
+  animation-delay: 240ms;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] svg > :nth-child(5) {
+  animation-duration: 100ms;
+  animation-delay: 320ms;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] svg > :nth-child(4) {
+  animation-duration: 160ms;
+  animation-delay: 380ms;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] [data-divider-line] {
+  animation: side-chat-entry-line 320ms cubic-bezier(0.22, 1, 0.36, 1) 280ms both;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] [data-divider-line="start"] {
+  transform-origin: right;
+}
+
+[data-side-chat-entering] [data-timeline-fork-marker] [data-divider-line="end"] {
+  transform-origin: left;
 }
 
 [data-side-chat-entering] [data-chat-composer-stack] {
   animation: side-chat-entry-rise 200ms cubic-bezier(0.22, 1, 0.36, 1) 400ms both;
 }
 
-@keyframes side-chat-entry-loader {
-  0%,
-  63% {
-    opacity: 1;
-    animation-timing-function: ease-out;
+@keyframes side-chat-entry-reveal {
+  from {
+    -webkit-mask-position: 0 100%;
+    mask-position: 0 100%;
   }
-  87%,
-  100% {
-    opacity: 0;
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
   }
 }
 
-@keyframes side-chat-entry-progress {
+@keyframes side-chat-entry-pop {
   from {
-    transform: scaleX(0.04);
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes side-chat-entry-draw {
+  from {
+    stroke-dashoffset: 40;
   }
   to {
-    transform: scaleX(1);
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes side-chat-entry-line {
+  from {
+    transform: scaleX(0);
   }
 }
 
@@ -2255,12 +2306,20 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .side-chat-entry-progress {
-    animation: none;
+  [data-side-chat-entering] [data-chat-messages] {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
+  [data-side-chat-entering] [data-chat-messages],
   [data-side-chat-entering] [data-chat-composer-stack] {
     animation-name: side-chat-entry-fade;
+  }
+
+  [data-side-chat-entering] [data-timeline-fork-marker] [data-divider-label],
+  [data-side-chat-entering] [data-timeline-fork-marker] svg > *,
+  [data-side-chat-entering] [data-timeline-fork-marker] [data-divider-line] {
+    animation: none;
   }
 }
 

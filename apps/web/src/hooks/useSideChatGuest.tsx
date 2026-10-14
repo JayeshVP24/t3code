@@ -17,7 +17,6 @@ export interface SideChatEmbedding {
   readonly focused: boolean;
   /** First showing of a side chat this client just started: play the entry. */
   readonly entering: boolean;
-  readonly onEntered: () => void;
 }
 
 /**
