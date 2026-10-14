@@ -16,10 +16,11 @@ panel next to the thread, stays out of the sidebar, and keeps working while the 
 
 ## Talking to a side chat
 
-Starting or reopening a side chat hands it the thread's composer. A **Side chat** banner above the
-composer says so, and every message you send goes to the side chat, without typing `/btw` again.
-Press Escape, or the banner's close button, to talk to the main thread again. Your draft for the
-main thread is still there. **Reply in side chat** at the bottom of the side chat switches back.
+Each side chat has its own composer at the bottom of its panel, next to the main thread's. Type in
+either one; each keeps its own draft, and neither borrows the other's place. Starting or reopening
+a side chat moves your keyboard to its composer, and a **Side chat** banner above it says where
+typing outside a composer goes. Press Escape, or the banner's close button, to give the keyboard
+back to the main thread. Clicking a composer talks through that one.
 
 If the main thread asks for an approval or an answer while you're in a side chat, a banner says
 so. Escape takes you to it.

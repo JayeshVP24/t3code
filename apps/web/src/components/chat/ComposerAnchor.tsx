@@ -1,57 +1,22 @@
 import type { CSSProperties, ReactNode, Ref } from "react";
-import { createPortal } from "react-dom";
 
 /**
- * Where a chat view's composer renders. One composer per thread is visible: a
- * side chat with focus renders its composer in its parent's slot, and the
- * parent's own composer hides meanwhile.
+ * Where a chat view's composer renders: in place, under its own timeline. A
+ * side chat keeps its composer in its panel next to the host's, so both stay
+ * visible and each sends to its own thread. Focus capture on the anchor says
+ * which composer the thread's redirected input talks to.
  */
-export type ComposerAnchorPlacement =
-  | {
-      readonly kind: "host";
-      /** A side chat has this thread's composer. */
-      readonly hidden: boolean;
-    }
-  | {
-      readonly kind: "side-chat";
-      readonly threadId: string;
-      readonly focused: boolean;
-      /** The parent's slot; null where the parent column is out of view, so it stays in place. */
-      readonly slot: HTMLElement | null;
-      /** Shown instead of the composer while the parent has it. */
-      readonly replyBar: ReactNode;
-    };
-
 export function ComposerAnchor(props: {
   readonly anchorRef: Ref<HTMLDivElement>;
-  /** Host only: the slot below the composer where a focused side chat's composer renders. */
-  readonly slotRef?: Ref<HTMLDivElement> | undefined;
   readonly style?: CSSProperties | undefined;
-  readonly placement: ComposerAnchorPlacement;
+  /** Focus entered this composer; the thread talks through it from here. */
+  readonly onFocusCapture?: (() => void) | undefined;
   readonly children: ReactNode;
 }) {
-  const { anchorRef, slotRef, style, placement, children } = props;
-  if (placement.kind === "side-chat" && !placement.focused) return placement.replyBar;
-  const anchor = (
-    <div
-      ref={anchorRef}
-      hidden={placement.kind === "host" && placement.hidden}
-      className="relative z-10"
-      style={style}
-    >
+  const { anchorRef, style, onFocusCapture, children } = props;
+  return (
+    <div ref={anchorRef} className="relative z-10" style={style} onFocusCapture={onFocusCapture}>
       {children}
     </div>
   );
-  if (placement.kind === "host") {
-    return (
-      <>
-        {anchor}
-        <div ref={slotRef} />
-      </>
-    );
-  }
-  if (placement.slot === null) return anchor;
-  // Window-level shortcuts tell chats apart by this attribute, and the portaled
-  // composer no longer sits inside the side chat's own root.
-  return createPortal(<div data-chat-embedded={placement.threadId}>{anchor}</div>, placement.slot);
 }

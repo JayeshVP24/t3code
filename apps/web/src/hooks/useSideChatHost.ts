@@ -1,15 +1,17 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { AssistantCitation, RunId, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 
 import type { ChatComposerHandle } from "../components/chat/ChatComposer";
+import { chatViewOf } from "../components/chat/composerEventScope";
 import type { RightPanelSurface } from "../rightPanelStore";
 import { resolveFocusedSideChat, useSideChatFocusStore } from "../sideChatStore";
 import { useSideChatActions } from "./useSideChatActions";
 
 /**
- * A thread's side of its side chats: the actions, which side chat its composer
- * talks to, and the slot that side chat's composer renders in.
+ * A thread's side of its side chats: the actions, and which side chat its
+ * redirected input talks to. Each side chat renders its own composer in its
+ * panel; focus only decides where typing and paste with no editable target go.
  */
 export function useSideChatHost(input: {
   /** Null for drafts and inside a side chat, which has none of its own. */
@@ -17,8 +19,6 @@ export function useSideChatHost(input: {
   readonly composerRef: RefObject<ChatComposerHandle | null>;
   readonly panelOpen: boolean;
   readonly activeSurface: RightPanelSurface | null;
-  /** The panel sits beside this thread's column, where the side chat's composer goes. */
-  readonly panelBesideColumn: boolean;
 }) {
   const { threadRef, composerRef } = input;
   const actions = useSideChatActions(threadRef);
@@ -34,16 +34,24 @@ export function useSideChatHost(input: {
   // The side chat's composer, so keys typed or pasted anywhere in this thread
   // go where the user is talking.
   const sideComposerRef = useRef<ChatComposerHandle | null>(null);
-  const [composerSlot, setComposerSlot] = useState<HTMLDivElement | null>(null);
 
-  // Back from a side chat, this thread's composer takes the keyboard again.
+  // Back from a side chat, this thread's composer takes the keyboard again —
+  // unless a click into it is what brought the user back, caret included.
   const hadFocusedSideChat = useRef(false);
   useEffect(() => {
     if (focusedSideChatId === null && hadFocusedSideChat.current) {
-      composerRef.current?.focusAtEnd();
+      const active = document.activeElement;
+      const inOwnComposer =
+        active?.getAttribute("data-testid") === "composer-editor" && chatViewOf(active) === null;
+      if (!inOwnComposer) composerRef.current?.focusAtEnd();
     }
     hadFocusedSideChat.current = focusedSideChatId !== null;
   }, [composerRef, focusedSideChatId]);
+
+  /** Focusing this thread's own composer hands redirected input back to it. */
+  const releaseSideChat = useCallback(() => {
+    if (threadKey !== null) useSideChatFocusStore.getState().release(threadKey);
+  }, [threadKey]);
 
   const start = actions.start;
   const threadId = threadRef?.threadId ?? null;
@@ -68,8 +76,7 @@ export function useSideChatHost(input: {
     available: actions.supported && threadRef !== null,
     focusedSideChatId,
     sideComposerRef,
-    composerSlot: input.panelBesideColumn ? composerSlot : null,
-    setComposerSlot,
+    releaseSideChat,
     onAskAboutResponse,
     onAskAssistantText,
   };
